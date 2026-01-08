@@ -11,11 +11,20 @@ def create_app():
     """Create and configure the Flask application."""
     app = Flask(__name__)
     
-    # Configure database
-    basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-    app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "inventory.db")}'
+    # Configure database - use PostgreSQL if DATABASE_URL is set, otherwise SQLite
+    database_url = os.environ.get('DATABASE_URL')
+    if database_url:
+        # Railway/Heroku PostgreSQL - fix postgres:// to postgresql://
+        if database_url.startswith('postgres://'):
+            database_url = database_url.replace('postgres://', 'postgresql://', 1)
+        app.config['SQLALCHEMY_DATABASE_URI'] = database_url
+    else:
+        # Local development - use SQLite
+        basedir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+        app.config['SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{os.path.join(basedir, "inventory.db")}'
+    
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SECRET_KEY'] = 'dev-key-change-in-production'
+    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-production')
     
     # Initialize extensions
     db.init_app(app)
