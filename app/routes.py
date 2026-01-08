@@ -31,6 +31,11 @@ def index():
     """Dashboard home page with forecast summary"""
     from datetime import date
     
+    # Get sort and filter params
+    sort_by = request.args.get('sort', 'units_to_make')  # units_to_make, doi_total, inventory
+    sort_order = request.args.get('order', 'desc')  # asc, desc
+    filter_algo = request.args.get('algo', 'all')  # all, 0-6m, 6-18m, 18m+
+    
     # Get products with inventory (active products)
     products_with_inventory = db.session.query(Product, Inventory)\
         .join(Inventory, Product.id == Inventory.product_id)\
@@ -129,8 +134,20 @@ def index():
                 'age_months': int(product_age_months)
             })
     
-    # Sort by units_to_make (highest first)
-    product_forecasts.sort(key=lambda x: x['units_to_make'], reverse=True)
+    # Filter by algorithm if specified
+    if filter_algo != 'all':
+        product_forecasts = [p for p in product_forecasts if p['algorithm'] == filter_algo]
+    
+    # Sort based on parameter
+    reverse_order = sort_order == 'desc'
+    if sort_by == 'doi_total':
+        product_forecasts.sort(key=lambda x: x['doi_total'], reverse=reverse_order)
+    elif sort_by == 'inventory':
+        product_forecasts.sort(key=lambda x: x['inventory'].total_inventory, reverse=reverse_order)
+    elif sort_by == 'age':
+        product_forecasts.sort(key=lambda x: x['age_months'], reverse=reverse_order)
+    else:  # default: units_to_make
+        product_forecasts.sort(key=lambda x: x['units_to_make'], reverse=reverse_order)
     
     # Get summary stats
     total_products = len(products_with_inventory)
@@ -144,6 +161,25 @@ def index():
     fba_total = latest_inventory[0] or 0
     awd_total = latest_inventory[1] or 0
     
+    # Count by algorithm
+    algo_counts = {'0-6m': 0, '6-18m': 0, '18m+': 0}
+    for p in products_with_inventory:
+        product = p[0]
+        sales_data = get_product_sales_data(product.id)
+        if sales_data:
+            first_sale = min(s.get('week_end') for s in sales_data if s.get('week_end'))
+            if first_sale:
+                if isinstance(first_sale, str):
+                    first_sale = datetime.strptime(first_sale, '%Y-%m-%d').date()
+                days_old = (today - first_sale).days
+                age_months = days_old / 30.44
+                if age_months < 6:
+                    algo_counts['0-6m'] += 1
+                elif age_months < 18:
+                    algo_counts['6-18m'] += 1
+                else:
+                    algo_counts['18m+'] += 1
+    
     return render_template('index.html',
         product_forecasts=product_forecasts,
         total_products=total_products,
@@ -152,7 +188,11 @@ def index():
         fba_total=int(fba_total),
         awd_total=int(awd_total),
         critical_count=critical_count,
-        low_stock_count=low_stock_count
+        low_stock_count=low_stock_count,
+        sort_by=sort_by,
+        sort_order=sort_order,
+        filter_algo=filter_algo,
+        algo_counts=algo_counts
     )
 
 

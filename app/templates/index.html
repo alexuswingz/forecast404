@@ -36,12 +36,33 @@
 <div class="card">
     <div class="card-header">
         <h2 class="card-title">Products - Units to Make</h2>
-        <a href="{{ url_for('main.import_data') }}" class="btn btn-primary btn-sm">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-            </svg>
-            Import Data
-        </a>
+        <div class="header-actions">
+            <!-- Algorithm Filter -->
+            <div class="filter-group">
+                <a href="?algo=all&sort={{ sort_by }}&order={{ sort_order }}" 
+                   class="filter-btn {% if filter_algo == 'all' %}active{% endif %}">
+                    All ({{ algo_counts['0-6m'] + algo_counts['6-18m'] + algo_counts['18m+'] }})
+                </a>
+                <a href="?algo=0-6m&sort={{ sort_by }}&order={{ sort_order }}" 
+                   class="filter-btn filter-0-6m {% if filter_algo == '0-6m' %}active{% endif %}">
+                    0-6m ({{ algo_counts['0-6m'] }})
+                </a>
+                <a href="?algo=6-18m&sort={{ sort_by }}&order={{ sort_order }}" 
+                   class="filter-btn filter-6-18m {% if filter_algo == '6-18m' %}active{% endif %}">
+                    6-18m ({{ algo_counts['6-18m'] }})
+                </a>
+                <a href="?algo=18m%2B&sort={{ sort_by }}&order={{ sort_order }}" 
+                   class="filter-btn filter-18m {% if filter_algo == '18m+' %}active{% endif %}">
+                    18m+ ({{ algo_counts['18m+'] }})
+                </a>
+            </div>
+            <a href="{{ url_for('main.import_data') }}" class="btn btn-primary btn-sm">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                Import Data
+            </a>
+        </div>
     </div>
     
     {% if product_forecasts %}
@@ -52,10 +73,38 @@
                     <th>Status</th>
                     <th>ASIN</th>
                     <th>Product Name</th>
-                    <th class="text-right">Units to Make</th>
-                    <th class="text-right">DOI (Days)</th>
-                    <th class="text-right">Inventory</th>
-                    <th>Algorithm</th>
+                    <th class="text-right sortable">
+                        <a href="?sort=units_to_make&order={% if sort_by == 'units_to_make' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'units_to_make' %}active{% endif %}">
+                            Units to Make
+                            {% if sort_by == 'units_to_make' %}
+                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="text-right sortable">
+                        <a href="?sort=doi_total&order={% if sort_by == 'doi_total' and sort_order == 'asc' %}desc{% else %}asc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'doi_total' %}active{% endif %}">
+                            DOI (Days)
+                            {% if sort_by == 'doi_total' %}
+                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="text-right sortable">
+                        <a href="?sort=inventory&order={% if sort_by == 'inventory' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'inventory' %}active{% endif %}">
+                            Inventory
+                            {% if sort_by == 'inventory' %}
+                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="sortable">
+                        <a href="?sort=age&order={% if sort_by == 'age' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'age' %}active{% endif %}">
+                            Algorithm
+                            {% if sort_by == 'age' %}
+                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
+                            {% endif %}
+                        </a>
+                    </th>
                     <th class="text-right">Actions</th>
                 </tr>
             </thead>
@@ -197,6 +246,84 @@
     .algo-18mplus {
         background: rgba(168, 85, 247, 0.15);
         color: #a855f7;
+    }
+    
+    /* Header actions */
+    .header-actions {
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        flex-wrap: wrap;
+    }
+    
+    /* Filter buttons */
+    .filter-group {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+    .filter-btn {
+        padding: 0.4rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        text-decoration: none;
+        color: var(--text-secondary);
+        background: var(--bg-secondary);
+        border: 1px solid transparent;
+        transition: all 0.2s;
+    }
+    .filter-btn:hover {
+        background: var(--bg-tertiary);
+        color: var(--text-primary);
+    }
+    .filter-btn.active {
+        background: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+    .filter-0-6m.active {
+        background: rgba(16, 185, 129, 0.2);
+        color: #10b981;
+        border-color: #10b981;
+    }
+    .filter-6-18m.active {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+        border-color: #3b82f6;
+    }
+    .filter-18m.active {
+        background: rgba(168, 85, 247, 0.2);
+        color: #a855f7;
+        border-color: #a855f7;
+    }
+    
+    /* Sortable headers */
+    .sortable {
+        cursor: pointer;
+    }
+    .sort-link {
+        text-decoration: none;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.25rem;
+        transition: color 0.2s;
+    }
+    .sort-link:hover {
+        color: var(--primary);
+    }
+    .sort-link.active {
+        color: var(--primary);
+        font-weight: 600;
+    }
+    .sort-icon {
+        font-size: 0.7rem;
+        opacity: 0.8;
+    }
+    th.sortable:hover {
+        background: rgba(34, 211, 238, 0.1);
     }
 </style>
 {% endblock %}
