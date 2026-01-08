@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - TPS AutoForecast{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Forecast Settings</h1>
+    <p class="page-subtitle">Configure forecast algorithm parameters</p>
+</div>
+
+<div class="card" style="max-width: 700px;">
+    <div class="card-header">
+        <h2 class="card-title">Algorithm Parameters</h2>
+    </div>
+    
+    <form method="POST">
+        {% for setting in settings %}
+        <div class="form-group">
+            <label class="form-label">
+                {{ setting.name | replace('_', ' ') | title }}
+                {% if setting.description %}
+                <span class="text-muted" style="font-weight: normal; font-size: 0.85rem;">
+                    - {{ setting.description }}
+                </span>
+                {% endif %}
+            </label>
+            <input type="number" 
+                   name="setting_{{ setting.name }}" 
+                   value="{{ setting.value }}" 
+                   step="0.01" 
+                   class="form-input" 
+                   style="max-width: 200px;">
+        </div>
+        {% endfor %}
+        
+        {% if not settings %}
+        <p class="text-muted">No settings configured yet. Import data first to initialize default settings.</p>
+        {% endif %}
+        
+        <button type="submit" class="btn btn-primary">
+            <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            Save Settings
+        </button>
+    </form>
+</div>
+
+<div class="card" style="max-width: 700px;">
+    <div class="card-header">
+        <h2 class="card-title">Settings Guide</h2>
+    </div>
+    
+    <div style="color: var(--text-secondary); line-height: 1.8;">
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Forecast Multiplier</h4>
+        <p class="mb-2"><strong>Key setting for matching Excel values.</strong> Adjusts the base forecast to calibrate with your Excel spreadsheet. Higher values = more aggressive forecast = lower DOI, higher Units to Make. Default: 3.1</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Amazon DOI Goal</h4>
+        <p class="mb-2">Target days of inventory coverage for Amazon. Default: 120 days</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Inbound Lead Time</h4>
+        <p class="mb-2">Days to ship inventory to Amazon (shipping time). Default: 30 days</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Manufacture Lead Time</h4>
+        <p class="mb-2">Days to produce inventory (production time). Default: 7 days</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Market Adjustment</h4>
+        <p class="mb-2">Year-over-year growth assumption applied to 18+ month forecasts. Set to 0.05 for 5% expected growth. Default: 0.05</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Velocity Adjustment</h4>
+        <p class="mb-2">Controls how much recent sales velocity affects forecasts. Default: 24.0</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Velocity Weight</h4>
+        <p class="mb-2">Weight applied to velocity adjustment. Higher = more emphasis on recent trends. Default: 0.15 (15%)</p>
+        
+        <h4 style="color: var(--text-primary); margin-bottom: 0.5rem;">Timezone Offset</h4>
+        <p>GMT offset for date calculations to match your Excel. Default: -7 (Pacific Time, GMT-7)</p>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.asin }} - TPS AutoForecast{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">{{ product.product_name or product.asin }}</h1>
+    <p class="page-subtitle">ASIN: <span class="mono">{{ product.asin }}</span> {% if product.size %}| Size: {{ product.size }}{% endif %}</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="stats-grid">
+    {% if inventory %}
+    <div class="stat-card">
+        <div class="stat-label">Total Inventory</div>
+        <div class="stat-value">{{ "{:,}".format(inventory.total_inventory|int) }}</div>
+    </div>
+    <div class="stat-card success">
+        <div class="stat-label">FBA Available</div>
+        <div class="stat-value">{{ "{:,}".format(inventory.fba_available|int) }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">AWD Available</div>
+        <div class="stat-value">{{ "{:,}".format(inventory.awd_available|int) }}</div>
+    </div>
+    <div class="stat-card warning">
+        <div class="stat-label">Inbound</div>
+        <div class="stat-value">{{ "{:,}".format((inventory.fba_inbound + inventory.awd_inbound)|int) }}</div>
+    </div>
+    {% else %}
+    <div class="stat-card">
+        <div class="stat-label">Inventory</div>
+        <div class="stat-value text-muted">No data</div>
+    </div>
+    {% endif %}
+</div>
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+    <!-- Sales History Chart -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Sales History (Last 52 Weeks)</h2>
+            <a href="{{ url_for('main.forecast_view', asin=product.asin) }}" class="btn btn-primary btn-sm">View Forecast</a>
+        </div>
+        <div class="chart-container">
+            <canvas id="salesChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Inventory Breakdown -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Inventory Breakdown</h2>
+        </div>
+        {% if inventory %}
+        <table>
+            <tbody>
+                <tr>
+                    <td>FBA Available</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.fba_available|int) }}</td>
+                </tr>
+                <tr>
+                    <td>FBA Reserved</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.fba_reserved|int) }}</td>
+                </tr>
+                <tr>
+                    <td>FBA Inbound</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.fba_inbound|int) }}</td>
+                </tr>
+                <tr>
+                    <td>AWD Available</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.awd_available|int) }}</td>
+                </tr>
+                <tr>
+                    <td>AWD Reserved</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.awd_reserved|int) }}</td>
+                </tr>
+                <tr>
+                    <td>AWD Inbound</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.awd_inbound|int) }}</td>
+                </tr>
+                <tr>
+                    <td>AWD → FBA Outbound</td>
+                    <td class="text-right mono">{{ "{:,}".format(inventory.awd_outbound_to_fba|int) }}</td>
+                </tr>
+                <tr style="border-top: 2px solid var(--border-color);">
+                    <td><strong>Total</strong></td>
+                    <td class="text-right mono"><strong>{{ "{:,}".format(inventory.total_inventory|int) }}</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted" style="padding: 1rem;">No inventory data available</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Vine Claims -->
+{% if vine_claims %}
+<div class="card mt-2">
+    <div class="card-header">
+        <h2 class="card-title">Vine Claims</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Units Claimed</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for claim in vine_claims %}
+                <tr>
+                    <td class="mono">{{ claim.claim_date }}</td>
+                    <td class="mono">{{ claim.units_claimed }}</td>
+                    <td>
+                        <span class="badge badge-warning">{{ claim.status }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Sales History Table -->
+<div class="card mt-2">
+    <div class="card-header">
+        <h2 class="card-title">Weekly Sales Data</h2>
+    </div>
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>Week End</th>
+                    <th>Week #</th>
+                    <th class="text-right">Units Sold</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sale in sales %}
+                <tr>
+                    <td class="mono">{{ sale.week_end }}</td>
+                    <td class="mono">{{ sale.week_number }}</td>
+                    <td class="text-right mono">{{ "{:,}".format(sale.units|int) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Sales Chart
+    const salesData = {{ sales|map(attribute='units')|list|tojson }}.reverse();
+    const salesLabels = {{ sales|map(attribute='week_end')|map('string')|list|tojson }}.reverse();
+    
+    const ctx = document.getElementById('salesChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: salesLabels,
+            datasets: [{
+                label: 'Units Sold',
+                data: salesData,
+                borderColor: 'rgba(34, 211, 238, 1)',
+                backgroundColor: 'rgba(34, 211, 238, 0.1)',
+                fill: true,
+                tension: 0.4,
+                pointRadius: 2,
+                pointHoverRadius: 6
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    display: false
+                },
+                y: {
+                    beginAtZero: true,
+                    grid: {
+                        color: 'rgba(51, 65, 85, 0.5)'
+                    },
+                    ticks: {
+                        color: '#94a3b8'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+</script>
+{% endblock %}
+

@@ -1,0 +1,709 @@
+{% extends "base.html" %}
+
+{% block title %}Forecast - {{ product.asin }} - TPS AutoForecast{% endblock %}
+
+{% block content %}
+<style>
+    .forecast-dashboard {
+        display: flex;
+        flex-direction: column;
+        gap: 1.25rem;
+    }
+    
+    /* Top Row - Product + Inventory Cards */
+    .top-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 1rem;
+    }
+    
+    /* Product Card */
+    .product-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.25rem;
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .product-image {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: #4ade80;
+        flex-shrink: 0;
+    }
+    
+    .product-info h2 {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        color: var(--text-primary);
+    }
+    
+    .product-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .product-meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .product-meta .label {
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+    }
+    
+    /* Inventory Cards */
+    .inventory-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.25rem;
+    }
+    
+    .inventory-header {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .inventory-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+    
+    .inventory-icon.fba {
+        background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+    }
+    
+    .inventory-icon.awd {
+        background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+    }
+    
+    .inventory-title {
+        font-weight: 700;
+        font-size: 1rem;
+    }
+    
+    .inventory-grid {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem 1rem;
+    }
+    
+    .inventory-label {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+    
+    .inventory-value {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        text-align: right;
+        color: var(--text-primary);
+    }
+    
+    /* Algorithm Cards */
+    .algorithm-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .algorithm-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .algorithm-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+    }
+    
+    .algorithm-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+    }
+    
+    .algorithm-badge.primary {
+        background: rgba(34, 211, 238, 0.15);
+        color: var(--accent-primary);
+    }
+    
+    .algorithm-badge.secondary {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--accent-warning);
+    }
+    
+    .algorithm-badge.tertiary {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--accent-success);
+    }
+    
+    .algorithm-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+    
+    .algorithm-stat {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1rem;
+    }
+    
+    .algorithm-stat.highlight {
+        background: rgba(245, 158, 11, 0.1);
+        border-color: rgba(245, 158, 11, 0.3);
+    }
+    
+    .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+    }
+    
+    .stat-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .stat-desc {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+    
+    /* DOI Timeline */
+    .doi-timeline {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.25rem;
+    }
+    
+    .doi-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        font-size: 0.85rem;
+    }
+    
+    .doi-bar-container {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    
+    .doi-bar {
+        flex: 1;
+        height: 48px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        display: flex;
+        overflow: hidden;
+    }
+    
+    .doi-segment {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        padding: 0.5rem;
+        color: white;
+        font-weight: 600;
+        min-width: 80px;
+    }
+    
+    .doi-segment .days {
+        font-size: 1rem;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    
+    .doi-segment .label {
+        font-size: 0.6rem;
+        text-transform: uppercase;
+        opacity: 0.9;
+    }
+    
+    .doi-fba {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    }
+    
+    .doi-total {
+        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    }
+    
+    .doi-forecast {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    }
+    
+    /* Forecast Chart */
+    .forecast-chart-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 16px;
+        padding: 1.5rem;
+    }
+    
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+    
+    .chart-title {
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+    
+    .chart-controls {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+    
+    .time-select {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+        cursor: pointer;
+    }
+    
+    .chart-container {
+        position: relative;
+        height: 350px;
+    }
+    
+    .chart-legend {
+        display: flex;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 1rem;
+        padding-top: 1rem;
+        border-top: 1px solid var(--border-color);
+    }
+    
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+    }
+    
+    .legend-line {
+        width: 24px;
+        height: 3px;
+        border-radius: 2px;
+    }
+    
+    .date-selector {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 0.5rem 1rem;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+    }
+</style>
+
+<div class="forecast-dashboard">
+    <!-- Header with Date Selector -->
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+            <h1 class="page-title">1000 Bananas – AutoForecast</h1>
+            <p class="text-muted">Blue cells are inputs. Black cells are formulas.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <label class="text-muted">Calculation Date:</label>
+            <input type="date" id="calcDate" value="{{ calc_date }}" class="date-selector" onchange="updateDate()">
+        </div>
+    </div>
+
+    <!-- Top Row: Product + Inventory -->
+    <div class="top-row">
+        <!-- Product Card -->
+        <div class="product-card">
+            <div class="product-image">🌿</div>
+            <div class="product-info">
+                <h2>{{ product.product_name or 'Unknown Product' }}</h2>
+                <div class="product-meta">
+                    <span><span class="label">SIZE:</span> {{ product.size or 'N/A' }}</span>
+                    <span><span class="label">ASIN:</span> <span class="mono">{{ product.asin }}</span></span>
+                    <span><span class="label">BRAND:</span> TPS Plant Foods</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- FBA Inventory Card -->
+        <div class="inventory-card">
+            <div class="inventory-header">
+                <div class="inventory-icon fba">📦</div>
+                <span class="inventory-title">FBA</span>
+            </div>
+            <div class="inventory-grid">
+                <span class="inventory-label">Total:</span>
+                <span class="inventory-value">{{ forecast.inventory.fba_available + forecast.inventory.fba_reserved + forecast.inventory.fba_inbound }}</span>
+                <span class="inventory-label">Available:</span>
+                <span class="inventory-value">{{ forecast.inventory.fba_available }}</span>
+                <span class="inventory-label">Reserved:</span>
+                <span class="inventory-value">{{ forecast.inventory.fba_reserved }}</span>
+                <span class="inventory-label">Inbound:</span>
+                <span class="inventory-value">{{ forecast.inventory.fba_inbound }}</span>
+            </div>
+        </div>
+        
+        <!-- AWD Inventory Card -->
+        <div class="inventory-card">
+            <div class="inventory-header">
+                <div class="inventory-icon awd">🏭</div>
+                <span class="inventory-title">AWD</span>
+            </div>
+            <div class="inventory-grid">
+                <span class="inventory-label">Total:</span>
+                <span class="inventory-value">{{ forecast.inventory.awd_available + forecast.inventory.awd_reserved + forecast.inventory.awd_inbound }}</span>
+                <span class="inventory-label">Available:</span>
+                <span class="inventory-value">{{ forecast.inventory.awd_available }}</span>
+                <span class="inventory-label">Reserved:</span>
+                <span class="inventory-value">{{ forecast.inventory.awd_reserved }}</span>
+                <span class="inventory-label">Inbound:</span>
+                <span class="inventory-value">{{ forecast.inventory.awd_inbound }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Algorithm Results Section -->
+    <div class="algorithm-section">
+        <div class="algorithm-header">
+            <h2 class="algorithm-title">Production Forecast</h2>
+        </div>
+        
+        <!-- 18+ Month Algorithm -->
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <span class="algorithm-badge primary">18+ Month Algorithm</span>
+            </div>
+            <div class="algorithm-grid">
+                <div class="algorithm-stat highlight">
+                    <div class="stat-label">Units to Make (18m+ Algorithm)</div>
+                    <div class="stat-value" style="color: var(--accent-warning);">{{ "{:,}".format(forecast.algorithms['18m+'].units_to_make|int) }}</div>
+                    <div class="stat-desc">Production Forecast (accounting for all formulas, weights, and current inventory)</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI Total (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['18m+'].doi_total_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including all amazon buckets and inbound</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI FBA Available (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['18m+'].doi_fba_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including only FBA Available</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 6-18 Month Algorithm -->
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <span class="algorithm-badge secondary">6-18 Month Algorithm</span>
+            </div>
+            <div class="algorithm-grid">
+                <div class="algorithm-stat highlight">
+                    <div class="stat-label">Units to Make (18m+ Algorithm)</div>
+                    <div class="stat-value" style="color: var(--accent-warning);">{{ "{:,}".format(forecast.algorithms['6-18m'].units_to_make|int) }}</div>
+                    <div class="stat-desc">Production Forecast (accounting for all formulas, weights, and current inventory)</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI Total (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['6-18m'].doi_total_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including all amazon buckets and inbound</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI FBA Available (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['6-18m'].doi_fba_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including only FBA Available</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 0-6 Month Algorithm -->
+        <div>
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                <span class="algorithm-badge tertiary">0-6 Month Algorithm</span>
+            </div>
+            <div class="algorithm-grid">
+                <div class="algorithm-stat highlight">
+                    <div class="stat-label">Units to Make (18m+ Algorithm)</div>
+                    <div class="stat-value" style="color: var(--accent-warning);">{{ "{:,}".format(forecast.algorithms['0-6m'].units_to_make|int) }}</div>
+                    <div class="stat-desc">Production Forecast (accounting for all formulas, weights, and current inventory)</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI Total (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['0-6m'].doi_total_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including all amazon buckets and inbound</div>
+                </div>
+                <div class="algorithm-stat">
+                    <div class="stat-label">DOI FBA Available (days)</div>
+                    <div class="stat-value">{{ forecast.algorithms['0-6m'].doi_fba_days|int }}</div>
+                    <div class="stat-desc">Total Days of Inventory including only FBA Available</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- DOI Timeline -->
+    <div class="doi-timeline">
+        <div class="doi-header">
+            <div>
+                <strong>Today</strong><br>
+                <span class="mono">{{ calc_date }}</span>
+            </div>
+            <div style="text-align: center;">
+                <strong>Lead Time Settings</strong><br>
+                <span class="text-muted">Amazon DOI: {{ forecast.settings.amazon_doi_goal }} | Inbound: {{ forecast.settings.inbound_lead_time }} | Mfg: {{ forecast.settings.manufacture_lead_time }}</span>
+            </div>
+            <div style="text-align: right;">
+                <strong>DOI Goal</strong><br>
+                <span class="mono">{{ forecast.settings.total_lead_time }} days</span>
+            </div>
+        </div>
+        <div class="doi-bar-container">
+            <div class="doi-bar">
+                <div class="doi-segment doi-fba" style="flex: {{ forecast.algorithms['18m+'].doi_fba_days }};">
+                    <span class="days">{{ forecast.algorithms['18m+'].doi_fba_days }} Days</span>
+                    <span class="label">FBA Available</span>
+                </div>
+                <div class="doi-segment doi-total" style="flex: {{ forecast.algorithms['18m+'].doi_total_days - forecast.algorithms['18m+'].doi_fba_days }};">
+                    <span class="days">{{ forecast.algorithms['18m+'].doi_total_days }} Days</span>
+                    <span class="label">Total</span>
+                </div>
+                <div class="doi-segment doi-forecast" style="flex: {{ forecast.settings.total_lead_time }};">
+                    <span class="days">{{ forecast.settings.total_lead_time }} Days</span>
+                    <span class="label">Goal</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Forecast Chart -->
+    <div class="forecast-chart-section">
+        <div class="chart-header">
+            <h2 class="chart-title">Unit Forecast</h2>
+            <div class="chart-controls">
+                <select class="time-select" id="algorithmSelect" onchange="updateChart()">
+                    <option value="18m+">18+ Month Algorithm</option>
+                    <option value="6-18m">6-18 Month Algorithm</option>
+                    <option value="0-6m">0-6 Month Algorithm</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="chart-container">
+            <canvas id="forecastChart"></canvas>
+        </div>
+        
+        <div class="chart-legend">
+            <div class="legend-item">
+                <div class="legend-line" style="background: var(--text-muted);"></div>
+                <span>Units Sold</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line" style="background: #f97316;"></div>
+                <span>Smoothed Units Sold</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-line" style="background: #f97316; border-top: 2px dashed #f97316;"></div>
+                <span>Forecast</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Debug Info -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div class="card-header">
+        <h2 class="card-title">Calculation Details</h2>
+    </div>
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem;">
+        <div>
+            <h4 style="margin-bottom: 0.5rem; color: var(--text-secondary);">0-6 Month Algorithm</h4>
+            <p class="text-muted" style="font-size: 0.85rem;">Uses Peak Sales × Seasonality^0.65</p>
+            <p class="mono">Units to Make: {{ forecast.algorithms['0-6m'].units_to_make|int }}</p>
+            <p class="mono">DOI: {{ forecast.algorithms['0-6m'].doi_total_days|int }} days</p>
+        </div>
+        <div>
+            <h4 style="margin-bottom: 0.5rem; color: var(--text-secondary);">6-18 Month Algorithm</h4>
+            <p class="text-muted" style="font-size: 0.85rem;">Uses Search Volume × Conversion Rate</p>
+            <p class="mono">Units to Make: {{ forecast.algorithms['6-18m'].units_to_make|int }}</p>
+            <p class="mono">DOI: {{ forecast.algorithms['6-18m'].doi_total_days|int }} days</p>
+        </div>
+        <div>
+            <h4 style="margin-bottom: 0.5rem; color: var(--text-secondary);">18+ Month Algorithm</h4>
+            <p class="text-muted" style="font-size: 0.85rem;">Uses Prior Year Smoothed + Velocity</p>
+            <p class="mono">Units to Make: {{ forecast.algorithms['18m+'].units_to_make|int }}</p>
+            <p class="mono">DOI: {{ forecast.algorithms['18m+'].doi_total_days|int }} days</p>
+        </div>
+    </div>
+    <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border-color);">
+        <p class="text-muted" style="font-size: 0.85rem;">
+            <strong>Active Algorithm:</strong> {{ forecast.active_algorithm }} (based on product age)
+        </p>
+    </div>
+</div>
+
+<div class="mt-2" style="display: flex; gap: 1rem;">
+    <a href="{{ url_for('main.product_detail', asin=product.asin) }}" class="btn btn-secondary">← Back to Product</a>
+    <a href="{{ url_for('main.index') }}" class="btn btn-secondary">Dashboard</a>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const forecastData = {{ forecast|tojson }};
+    const calcDate = '{{ calc_date }}';
+    
+    function updateDate() {
+        const newDate = document.getElementById('calcDate').value;
+        window.location.href = `/forecast/{{ product.asin }}?date=${newDate}`;
+    }
+    
+    // Main Forecast Chart
+    let chartInstance = null;
+    
+    function updateChart() {
+        const algorithm = document.getElementById('algorithmSelect').value;
+        const data = forecastData.forecasts[algorithm];
+        
+        if (chartInstance) {
+            chartInstance.destroy();
+        }
+        
+        const ctx = document.getElementById('forecastChart').getContext('2d');
+        
+        const labels = data.map(d => d.week_end);
+        const unitsSold = data.map(d => d.units || null);
+        const smoothed = data.map(d => d.units_final_smooth || d.units || null);
+        const forecast = data.map(d => {
+            const weekEnd = d.week_end;
+            return weekEnd >= calcDate ? d.forecast_units : null;
+        });
+        
+        chartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Units Sold',
+                        data: unitsSold,
+                        borderColor: 'rgba(148, 163, 184, 0.8)',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        tension: 0.4,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Smoothed',
+                        data: smoothed,
+                        borderColor: '#f97316',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2.5,
+                        tension: 0.4,
+                        pointRadius: 0
+                    },
+                    {
+                        label: 'Forecast',
+                        data: forecast,
+                        borderColor: '#f97316',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2.5,
+                        borderDash: [8, 4],
+                        tension: 0.4,
+                        pointRadius: 0
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                        ticks: { 
+                            color: '#94a3b8', 
+                            maxTicksLimit: 12,
+                            callback: function(val, index) {
+                                const date = new Date(this.getLabelForValue(val));
+                                return date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+                            }
+                        }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(51, 65, 85, 0.3)' },
+                        ticks: { color: '#94a3b8' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(26, 34, 53, 0.95)',
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#94a3b8',
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + Math.round(context.parsed.y).toLocaleString();
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // Initialize chart
+    updateChart();
+</script>
+{% endblock %}
