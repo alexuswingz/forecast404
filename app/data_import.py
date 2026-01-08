@@ -110,7 +110,8 @@ def import_units_sold(ws) -> tuple:
         if dt:
             week_dates.append((i, dt))
     
-    # Process each product row (starting from row 2)
+    # First pass: Create all products
+    product_map = {}  # asin -> product
     for row in range(2, ws.max_row + 1):
         asin = ws.cell(row=row, column=1).value
         product_name = ws.cell(row=row, column=2).value
@@ -119,43 +120,64 @@ def import_units_sold(ws) -> tuple:
         if not asin:
             continue
         
-        # Get or create product
-        product = Product.query.filter_by(asin=str(asin)).first()
+        asin_str = str(asin)
+        product = Product.query.filter_by(asin=asin_str).first()
         if not product:
             product = Product(
-                asin=str(asin),
+                asin=asin_str,
                 product_name=str(product_name) if product_name else None,
                 size=str(size) if size else None
             )
             db.session.add(product)
-            db.session.flush()
             products_created += 1
+        product_map[asin_str] = product
+    
+    db.session.commit()
+    
+    # Refresh product map with IDs
+    for asin in product_map:
+        product_map[asin] = Product.query.filter_by(asin=asin).first()
+    
+    # Clear existing sales data for faster import
+    UnitsSold.query.delete()
+    db.session.commit()
+    
+    # Second pass: Bulk insert all sales records
+    batch = []
+    batch_size = 1000
+    
+    for row in range(2, ws.max_row + 1):
+        asin = ws.cell(row=row, column=1).value
+        if not asin:
+            continue
         
-        # Import weekly sales
+        product = product_map.get(str(asin))
+        if not product:
+            continue
+        
         for col, week_date in week_dates:
             units_val = ws.cell(row=row, column=col).value
             units = int(float(units_val)) if units_val and str(units_val).replace('.', '').isdigit() else 0
-            
-            # Calculate week number
             week_num = week_date.isocalendar()[1]
             
-            # Check for existing record
-            existing = UnitsSold.query.filter_by(
+            batch.append(UnitsSold(
                 product_id=product.id,
-                week_end=week_date.date()
-            ).first()
+                week_end=week_date.date(),
+                week_number=week_num,
+                units=units
+            ))
+            records_created += 1
             
-            if existing:
-                existing.units = units
-            else:
-                record = UnitsSold(
-                    product_id=product.id,
-                    week_end=week_date.date(),
-                    week_number=week_num,
-                    units=units
-                )
-                db.session.add(record)
-                records_created += 1
+            # Commit in batches
+            if len(batch) >= batch_size:
+                db.session.bulk_save_objects(batch)
+                db.session.commit()
+                batch = []
+    
+    # Commit remaining
+    if batch:
+        db.session.bulk_save_objects(batch)
+        db.session.commit()
     
     return products_created, records_created
 
