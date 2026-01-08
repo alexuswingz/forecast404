@@ -183,18 +183,23 @@ def product_detail(asin):
 @main_bp.route('/import', methods=['GET', 'POST'])
 def import_data():
     """Import data from Excel file"""
+    import tempfile
+    
     if request.method == 'POST':
         excel_file = request.files.get('excel_file')
         if excel_file:
-            # Save uploaded file
-            upload_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
-            os.makedirs(upload_path, exist_ok=True)
-            file_path = os.path.join(upload_path, excel_file.filename)
-            excel_file.save(file_path)
-            
+            # Save to temp file (works on Railway's ephemeral filesystem)
             try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
+                    excel_file.save(tmp.name)
+                    file_path = tmp.name
+                
                 results = import_excel_data(file_path)
                 init_default_settings()
+                
+                # Clean up temp file
+                os.unlink(file_path)
+                
                 flash(f"Import successful! Products: {results['products']}, "
                       f"Sales records: {results['units_sold_records']}, "
                       f"Inventory: {results['inventory_records']}", 'success')
