@@ -17,6 +17,7 @@ class Product(db.Model):
     units_sold = db.relationship('UnitsSold', backref='product', lazy='dynamic')
     inventory = db.relationship('Inventory', backref='product', lazy='dynamic')
     vine_claims = db.relationship('VineClaim', backref='product', lazy='dynamic')
+    seasonality = db.relationship('Seasonality', backref='product', lazy='dynamic')
     
     def __repr__(self):
         return f'<Product {self.asin}>'
@@ -141,11 +142,12 @@ class VineClaim(db.Model):
 
 
 class Seasonality(db.Model):
-    """Seasonality indices by week"""
+    """Seasonality indices by week - PER PRODUCT (for 0-6m and 6-18m algorithms)"""
     __tablename__ = 'seasonality'
     
     id = db.Column(db.Integer, primary_key=True)
-    week_of_year = db.Column(db.Integer, nullable=False, unique=True)
+    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=True, index=True)
+    week_of_year = db.Column(db.Integer, nullable=False)
     search_volume = db.Column(db.Float)
     
     # Calculated fields
@@ -158,11 +160,17 @@ class Seasonality(db.Model):
     seasonality_index = db.Column(db.Float)  # normalized 0-1
     seasonality_multiplier = db.Column(db.Float)  # relative to average
     
+    # Unique constraint: one seasonality per week per product
+    __table_args__ = (
+        db.UniqueConstraint('product_id', 'week_of_year', name='unique_product_seasonality'),
+    )
+    
     def __repr__(self):
-        return f'<Seasonality Week {self.week_of_year}: {self.seasonality_index}>'
+        return f'<Seasonality Product {self.product_id} Week {self.week_of_year}: {self.seasonality_index}>'
     
     def to_dict(self):
         return {
+            'product_id': self.product_id,
             'week_of_year': self.week_of_year,
             'search_volume': self.search_volume,
             'seasonality_index': self.seasonality_index,

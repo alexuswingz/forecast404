@@ -41,8 +41,7 @@ def index():
         .join(Inventory, Product.id == Inventory.product_id)\
         .order_by(Product.product_name).all()
     
-    # Get seasonality and settings for forecasts
-    seasonality = get_seasonality_data()
+    # Get settings for forecasts
     settings = get_forecast_settings()
     today = date.today()
     
@@ -54,8 +53,9 @@ def index():
     low_stock_count = 0
     
     for product, inventory in products_with_inventory:
-        # Get sales data
+        # Get sales data and product-specific seasonality
         sales_data = get_product_sales_data(product.id)
+        seasonality = get_seasonality_data(product.id)  # Per-product seasonality
         inv_dict = {
             'total_inventory': inventory.total_inventory,
             'fba_available': inventory.fba_available
@@ -273,9 +273,9 @@ def forecast_view(asin):
     else:
         calc_date = date_type.today()
     
-    # Get data for forecast
+    # Get data for forecast (seasonality is per-product for 0-6m and 6-18m)
     sales_data = get_product_sales_data(product.id)
-    seasonality = get_seasonality_data()
+    seasonality = get_seasonality_data(product.id)
     inventory = get_product_inventory(product.id)
     settings = get_forecast_settings()
     
@@ -370,10 +370,10 @@ def api_product_forecast(asin):
     # Get forecast type
     forecast_type = request.args.get('type', 'all')  # '0-6m', '6-18m', '18m+', 'all'
     
-    # Gather data
+    # Gather data (seasonality is per-product)
     sales_data = get_product_sales_data(product.id)
     prior_year_data = get_prior_year_data(product.id)
-    seasonality = get_seasonality_data()
+    seasonality = get_seasonality_data(product.id)
     inventory = get_product_inventory(product.id)
     settings = get_forecast_settings()
     
@@ -381,7 +381,6 @@ def api_product_forecast(asin):
     forecast = generate_full_forecast(
         product.asin,
         sales_data,
-        prior_year_data,
         seasonality,
         inventory,
         settings
@@ -440,12 +439,14 @@ def api_update_seasonality():
 
 @api_bp.route('/seasonality/upload', methods=['POST'])
 def api_upload_seasonality():
-    """Upload seasonality data from Excel template file.
+    """Upload seasonality data from Excel template file FOR A SPECIFIC PRODUCT.
     
     Expected format:
     - Column A: Week (1-52)
     - Column B: Seasonality_Data (search volume)
-    - Column C: Child_ASIN (optional, for reference)
+    - Column C: Child_ASIN (the product this seasonality applies to)
+    
+    Seasonality is per-product for 0-6m and 6-18m algorithms.
     """
     from openpyxl import load_workbook
     import tempfile
@@ -460,6 +461,9 @@ def api_upload_seasonality():
     if not file.filename.endswith(('.xlsx', '.xls')):
         return jsonify({'error': 'File must be an Excel file (.xlsx or .xls)'}), 400
     
+    # Get ASIN from form data (optional - can also be in file)
+    asin_from_form = request.form.get('asin', '').strip()
+    
     try:
         # Save to temp file
         with tempfile.NamedTemporaryFile(delete=False, suffix='.xlsx') as tmp:
@@ -472,7 +476,7 @@ def api_upload_seasonality():
         
         # Read search volumes by week number (1-52)
         search_volumes = [0] * 52  # Initialize 52 weeks
-        child_asin = None
+        child_asin = asin_from_form  # Use form ASIN if provided
         weeks_found = 0
         
         # Read data starting from row 2 (row 1 is header)
@@ -487,6 +491,7 @@ def api_upload_seasonality():
                     if 1 <= week_num <= 52:
                         search_volumes[week_num - 1] = float(volume)
                         weeks_found += 1
+                        # Use ASIN from file if not provided in form
                         if asin and not child_asin:
                             child_asin = str(asin)
                 except (ValueError, TypeError):
@@ -500,6 +505,14 @@ def api_upload_seasonality():
         
         if weeks_found == 0:
             return jsonify({'error': 'No valid data found in file. Expected: Week (1-52) in Column A, Seasonality_Data in Column B'}), 400
+        
+        if not child_asin:
+            return jsonify({'error': 'No ASIN provided. Please select a product or include Child_ASIN in Column C of the file.'}), 400
+        
+        # Find the product
+        product = Product.query.filter_by(asin=child_asin).first()
+        if not product:
+            return jsonify({'error': f'Product with ASIN {child_asin} not found'}), 404
         
         # Handle missing weeks by interpolation
         for i in range(52):
@@ -524,10 +537,13 @@ def api_upload_seasonality():
         # Calculate full seasonality
         seasonality_data = calculate_full_seasonality(search_volumes)
         
-        # Update database
-        Seasonality.query.delete()
+        # Delete existing seasonality for this product only
+        Seasonality.query.filter_by(product_id=product.id).delete()
+        
+        # Insert new seasonality for this product
         for s in seasonality_data:
             record = Seasonality(
+                product_id=product.id,
                 week_of_year=s['week_of_year'],
                 search_volume=s['search_volume'],
                 sv_peak_env=s['sv_peak_env'],
@@ -547,10 +563,11 @@ def api_upload_seasonality():
         
         return jsonify({
             'success': True,
-            'message': 'Seasonality data imported successfully',
+            'message': f'Seasonality data imported for {product.product_name or child_asin}',
             'weeks': weeks_found,
             'peak_week': peak_week,
-            'child_asin': child_asin
+            'asin': child_asin,
+            'product_name': product.product_name
         })
         
     except Exception as e:
@@ -796,10 +813,17 @@ def get_prior_year_data(product_id: int) -> list:
     ]
 
 
-def get_seasonality_data() -> list:
-    """Get seasonality data formatted for algorithms"""
-    seasonality = Seasonality.query.order_by(Seasonality.week_of_year).all()
-    return [s.to_dict() for s in seasonality]
+def get_seasonality_data(product_id: int = None) -> list:
+    """Get seasonality data formatted for algorithms.
+    
+    If product_id is provided, returns product-specific seasonality.
+    Otherwise returns empty list (no global seasonality).
+    """
+    if product_id:
+        seasonality = Seasonality.query.filter_by(product_id=product_id)\
+            .order_by(Seasonality.week_of_year).all()
+        return [s.to_dict() for s in seasonality]
+    return []
 
 
 def get_product_inventory(product_id: int) -> dict:

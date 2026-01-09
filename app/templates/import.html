@@ -41,12 +41,19 @@
 
 <div class="card" style="max-width: 600px;">
     <div class="card-header">
-        <h2 class="card-title">Upload Seasonality Data</h2>
+        <h2 class="card-title">Upload Seasonality Data (Per Product)</h2>
     </div>
     
-    <p class="text-muted mb-2">Upload category search volume data to calculate seasonality indices for forecasting.</p>
+    <p class="text-muted mb-2">Upload search volume data for a <strong>specific product</strong>. Seasonality affects 0-6m and 6-18m forecasts.</p>
     
     <form id="seasonalityForm" enctype="multipart/form-data">
+        <div class="form-group">
+            <label class="form-label">Select Product (ASIN)</label>
+            <select name="asin" id="seasonalityAsin" class="form-input" required>
+                <option value="">-- Select a Product --</option>
+            </select>
+        </div>
+        
         <div class="form-group">
             <label class="form-label">Select Seasonality File (.xlsx)</label>
             <input type="file" name="seasonality_file" id="seasonalityFile" accept=".xlsx,.xls" class="form-input" required>
@@ -57,10 +64,10 @@
             <ul style="color: var(--text-secondary); margin-left: 1.5rem; line-height: 1.8;">
                 <li><strong>Column A (Week):</strong> Week number (1-52)</li>
                 <li><strong>Column B (Seasonality_Data):</strong> Search volume value</li>
-                <li><strong>Column C (Child_ASIN):</strong> Product ASIN (optional)</li>
+                <li><strong>Column C (Child_ASIN):</strong> Product ASIN (optional, overrides dropdown)</li>
             </ul>
             <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 0.5rem;">
-                Upload exactly 52 rows (one per week). Missing weeks will be interpolated.
+                Upload 52 rows (one per week). Missing weeks will be interpolated.
             </p>
         </div>
         
@@ -68,7 +75,7 @@
             <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
             </svg>
-            Upload Seasonality
+            Upload Seasonality for Product
         </button>
     </form>
     
@@ -98,16 +105,44 @@
 
 {% block scripts %}
 <script>
+    // Load products for seasonality dropdown
+    async function loadProducts() {
+        try {
+            const response = await fetch('/api/products');
+            const products = await response.json();
+            const select = document.getElementById('seasonalityAsin');
+            
+            products.forEach(p => {
+                const option = document.createElement('option');
+                option.value = p.asin;
+                option.textContent = `${p.asin} - ${p.product_name || 'Unknown'}`;
+                select.appendChild(option);
+            });
+        } catch (error) {
+            console.error('Failed to load products:', error);
+        }
+    }
+    
+    // Load products on page load
+    loadProducts();
+    
     // Seasonality upload form
     document.getElementById('seasonalityForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const statusDiv = document.getElementById('seasonalityStatus');
         const fileInput = document.getElementById('seasonalityFile');
+        const asinSelect = document.getElementById('seasonalityAsin');
         
         if (!fileInput.files[0]) {
             statusDiv.style.display = 'block';
             statusDiv.innerHTML = '<div class="flash flash-error">Please select a file</div>';
+            return;
+        }
+        
+        if (!asinSelect.value) {
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = '<div class="flash flash-error">Please select a product</div>';
             return;
         }
         
@@ -116,6 +151,7 @@
         
         const formData = new FormData();
         formData.append('file', fileInput.files[0]);
+        formData.append('asin', asinSelect.value);
         
         try {
             const response = await fetch('/api/seasonality/upload', {
@@ -126,14 +162,16 @@
             const result = await response.json();
             
             if (response.ok && result.success) {
-                let asinInfo = result.child_asin ? `<br>Child ASIN: ${result.child_asin}` : '';
                 statusDiv.innerHTML = `
                     <div class="flash flash-success">
                         <strong>Seasonality imported successfully!</strong><br>
-                        Weeks processed: ${result.weeks}${asinInfo}<br>
+                        Product: ${result.product_name || result.asin}<br>
+                        ASIN: ${result.asin}<br>
+                        Weeks processed: ${result.weeks}<br>
                         Peak season week: ${result.peak_week}
                     </div>
-                    <a href="/" class="btn btn-primary mt-2">Go to Dashboard</a>
+                    <a href="/forecast/${result.asin}" class="btn btn-primary mt-2">View Forecast</a>
+                    <a href="/" class="btn btn-secondary mt-2" style="margin-left: 0.5rem;">Go to Dashboard</a>
                 `;
             } else {
                 statusDiv.innerHTML = `<div class="flash flash-error">Error: ${result.error}</div>`;
