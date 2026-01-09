@@ -37,24 +37,33 @@
     <div class="card-header">
         <h2 class="card-title">Products - Units to Make</h2>
         <div class="header-actions">
-            <!-- Algorithm Filter -->
-            <div class="filter-group">
-                <a href="?algo=all&sort={{ sort_by }}&order={{ sort_order }}" 
-                   class="filter-btn {% if filter_algo == 'all' %}active{% endif %}">
-                    All ({{ algo_counts['0-6m'] + algo_counts['6-18m'] + algo_counts['18m+'] }})
-                </a>
-                <a href="?algo=0-6m&sort={{ sort_by }}&order={{ sort_order }}" 
-                   class="filter-btn filter-0-6m {% if filter_algo == '0-6m' %}active{% endif %}">
-                    0-6m ({{ algo_counts['0-6m'] }})
-                </a>
-                <a href="?algo=6-18m&sort={{ sort_by }}&order={{ sort_order }}" 
-                   class="filter-btn filter-6-18m {% if filter_algo == '6-18m' %}active{% endif %}">
-                    6-18m ({{ algo_counts['6-18m'] }})
-                </a>
-                <a href="?algo=18m%2B&sort={{ sort_by }}&order={{ sort_order }}" 
-                   class="filter-btn filter-18m {% if filter_algo == '18m+' %}active{% endif %}">
-                    18m+ ({{ algo_counts['18m+'] }})
-                </a>
+            <!-- Filter Dropdown -->
+            <div class="filter-dropdown">
+                <button class="filter-toggle" onclick="toggleFilterMenu()">
+                    <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/>
+                    </svg>
+                    {% if filter_algo != 'all' or sort_by != 'units_to_make' %}
+                    <span class="filter-active-dot"></span>
+                    {% endif %}
+                </button>
+                <div class="filter-menu" id="filterMenu">
+                    <div class="filter-section">
+                        <div class="filter-label">Sort By</div>
+                        <a href="?sort=units_to_make&order=desc&algo={{ filter_algo }}" class="filter-option {% if sort_by == 'units_to_make' %}active{% endif %}">Units to Make (High→Low)</a>
+                        <a href="?sort=doi_total&order=asc&algo={{ filter_algo }}" class="filter-option {% if sort_by == 'doi_total' and sort_order == 'asc' %}active{% endif %}">DOI (Low→High)</a>
+                        <a href="?sort=doi_total&order=desc&algo={{ filter_algo }}" class="filter-option {% if sort_by == 'doi_total' and sort_order == 'desc' %}active{% endif %}">DOI (High→Low)</a>
+                        <a href="?sort=inventory&order=desc&algo={{ filter_algo }}" class="filter-option {% if sort_by == 'inventory' %}active{% endif %}">Inventory (High→Low)</a>
+                        <a href="?sort=age&order=desc&algo={{ filter_algo }}" class="filter-option {% if sort_by == 'age' %}active{% endif %}">Product Age</a>
+                    </div>
+                    <div class="filter-section">
+                        <div class="filter-label">Algorithm</div>
+                        <a href="?algo=all&sort={{ sort_by }}&order={{ sort_order }}" class="filter-option {% if filter_algo == 'all' %}active{% endif %}">All Products ({{ algo_counts['0-6m'] + algo_counts['6-18m'] + algo_counts['18m+'] }})</a>
+                        <a href="?algo=0-6m&sort={{ sort_by }}&order={{ sort_order }}" class="filter-option {% if filter_algo == '0-6m' %}active{% endif %}">0-6 months ({{ algo_counts['0-6m'] }})</a>
+                        <a href="?algo=6-18m&sort={{ sort_by }}&order={{ sort_order }}" class="filter-option {% if filter_algo == '6-18m' %}active{% endif %}">6-18 months ({{ algo_counts['6-18m'] }})</a>
+                        <a href="?algo=18m%2B&sort={{ sort_by }}&order={{ sort_order }}" class="filter-option {% if filter_algo == '18m+' %}active{% endif %}">18+ months ({{ algo_counts['18m+'] }})</a>
+                    </div>
+                </div>
             </div>
             <a href="{{ url_for('main.import_data') }}" class="btn btn-primary btn-sm">
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,38 +82,10 @@
                     <th>Status</th>
                     <th>ASIN</th>
                     <th>Product Name</th>
-                    <th class="text-right sortable">
-                        <a href="?sort=units_to_make&order={% if sort_by == 'units_to_make' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'units_to_make' %}active{% endif %}">
-                            Units to Make
-                            {% if sort_by == 'units_to_make' %}
-                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
-                            {% endif %}
-                        </a>
-                    </th>
-                    <th class="text-right sortable">
-                        <a href="?sort=doi_total&order={% if sort_by == 'doi_total' and sort_order == 'asc' %}desc{% else %}asc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'doi_total' %}active{% endif %}">
-                            DOI (Days)
-                            {% if sort_by == 'doi_total' %}
-                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
-                            {% endif %}
-                        </a>
-                    </th>
-                    <th class="text-right sortable">
-                        <a href="?sort=inventory&order={% if sort_by == 'inventory' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'inventory' %}active{% endif %}">
-                            Inventory
-                            {% if sort_by == 'inventory' %}
-                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
-                            {% endif %}
-                        </a>
-                    </th>
-                    <th class="sortable">
-                        <a href="?sort=age&order={% if sort_by == 'age' and sort_order == 'desc' %}asc{% else %}desc{% endif %}&algo={{ filter_algo }}" class="sort-link {% if sort_by == 'age' %}active{% endif %}">
-                            Algorithm
-                            {% if sort_by == 'age' %}
-                                <span class="sort-icon">{% if sort_order == 'desc' %}▼{% else %}▲{% endif %}</span>
-                            {% endif %}
-                        </a>
-                    </th>
+                    <th class="text-right">Units to Make</th>
+                    <th class="text-right">DOI (Days)</th>
+                    <th class="text-right">Inventory</th>
+                    <th>Algorithm</th>
                     <th class="text-right">Actions</th>
                 </tr>
             </thead>
@@ -251,79 +232,106 @@
     /* Header actions */
     .header-actions {
         display: flex;
-        gap: 1rem;
+        gap: 0.75rem;
         align-items: center;
-        flex-wrap: wrap;
     }
     
-    /* Filter buttons */
-    .filter-group {
+    /* Filter dropdown */
+    .filter-dropdown {
+        position: relative;
+    }
+    .filter-toggle {
         display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-    }
-    .filter-btn {
-        padding: 0.4rem 0.75rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-        font-weight: 500;
-        text-decoration: none;
-        color: var(--text-secondary);
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
         background: var(--bg-secondary);
-        border: 1px solid transparent;
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        cursor: pointer;
         transition: all 0.2s;
+        position: relative;
     }
-    .filter-btn:hover {
+    .filter-toggle:hover {
         background: var(--bg-tertiary);
-        color: var(--text-primary);
-    }
-    .filter-btn.active {
-        background: var(--primary);
-        color: white;
+        color: var(--primary);
         border-color: var(--primary);
     }
-    .filter-0-6m.active {
-        background: rgba(16, 185, 129, 0.2);
-        color: #10b981;
-        border-color: #10b981;
+    .filter-active-dot {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        width: 8px;
+        height: 8px;
+        background: var(--primary);
+        border-radius: 50%;
     }
-    .filter-6-18m.active {
-        background: rgba(59, 130, 246, 0.2);
-        color: #3b82f6;
-        border-color: #3b82f6;
+    .filter-menu {
+        display: none;
+        position: absolute;
+        top: calc(100% + 8px);
+        right: 0;
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        min-width: 220px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        z-index: 100;
+        overflow: hidden;
     }
-    .filter-18m.active {
-        background: rgba(168, 85, 247, 0.2);
-        color: #a855f7;
-        border-color: #a855f7;
+    .filter-menu.show {
+        display: block;
     }
-    
-    /* Sortable headers */
-    .sortable {
-        cursor: pointer;
+    .filter-section {
+        padding: 0.75rem;
+        border-bottom: 1px solid var(--border);
     }
-    .sort-link {
-        text-decoration: none;
-        color: var(--text-secondary);
-        display: flex;
-        align-items: center;
-        justify-content: flex-end;
-        gap: 0.25rem;
-        transition: color 0.2s;
+    .filter-section:last-child {
+        border-bottom: none;
     }
-    .sort-link:hover {
-        color: var(--primary);
-    }
-    .sort-link.active {
-        color: var(--primary);
-        font-weight: 600;
-    }
-    .sort-icon {
+    .filter-label {
         font-size: 0.7rem;
-        opacity: 0.8;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: var(--text-muted);
+        margin-bottom: 0.5rem;
+        padding: 0 0.5rem;
     }
-    th.sortable:hover {
+    .filter-option {
+        display: block;
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-radius: 6px;
+        transition: all 0.15s;
+    }
+    .filter-option:hover {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+    }
+    .filter-option.active {
         background: rgba(34, 211, 238, 0.1);
+        color: var(--primary);
+        font-weight: 500;
     }
 </style>
+<script>
+    function toggleFilterMenu() {
+        const menu = document.getElementById('filterMenu');
+        menu.classList.toggle('show');
+    }
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', function(e) {
+        const dropdown = document.querySelector('.filter-dropdown');
+        const menu = document.getElementById('filterMenu');
+        if (dropdown && !dropdown.contains(e.target)) {
+            menu.classList.remove('show');
+        }
+    });
+</script>
 {% endblock %}

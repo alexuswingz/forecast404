@@ -61,16 +61,18 @@ def index():
             'fba_available': inventory.fba_available
         }
         
-        # Calculate product age in months from first sale
+        # Calculate product age in months from first sale WITH units > 0
         product_age_months = 0
         if sales_data:
-            first_sale = min(s.get('week_end') for s in sales_data if s.get('week_end'))
-            if first_sale:
-                if isinstance(first_sale, str):
-                    from datetime import datetime
-                    first_sale = datetime.strptime(first_sale, '%Y-%m-%d').date()
-                days_old = (today - first_sale).days
-                product_age_months = days_old / 30.44  # Average days per month
+            # Filter to only weeks with actual sales (units > 0)
+            sales_with_units = [s for s in sales_data if s.get('units', 0) > 0]
+            if sales_with_units:
+                first_sale = min(s.get('week_end') for s in sales_with_units if s.get('week_end'))
+                if first_sale:
+                    if isinstance(first_sale, str):
+                        first_sale = datetime.strptime(first_sale, '%Y-%m-%d').date()
+                    days_old = (today - first_sale).days
+                    product_age_months = days_old / 30.44  # Average days per month
         
         # Determine which algorithm to use based on age
         if product_age_months < 6:
@@ -161,24 +163,27 @@ def index():
     fba_total = latest_inventory[0] or 0
     awd_total = latest_inventory[1] or 0
     
-    # Count by algorithm
+    # Count by algorithm (using first sale with units > 0)
     algo_counts = {'0-6m': 0, '6-18m': 0, '18m+': 0}
     for p in products_with_inventory:
         product = p[0]
         sales_data = get_product_sales_data(product.id)
         if sales_data:
-            first_sale = min(s.get('week_end') for s in sales_data if s.get('week_end'))
-            if first_sale:
-                if isinstance(first_sale, str):
-                    first_sale = datetime.strptime(first_sale, '%Y-%m-%d').date()
-                days_old = (today - first_sale).days
-                age_months = days_old / 30.44
-                if age_months < 6:
-                    algo_counts['0-6m'] += 1
-                elif age_months < 18:
-                    algo_counts['6-18m'] += 1
-                else:
-                    algo_counts['18m+'] += 1
+            # Filter to only weeks with actual sales (units > 0)
+            sales_with_units = [s for s in sales_data if s.get('units', 0) > 0]
+            if sales_with_units:
+                first_sale = min(s.get('week_end') for s in sales_with_units if s.get('week_end'))
+                if first_sale:
+                    if isinstance(first_sale, str):
+                        first_sale = datetime.strptime(first_sale, '%Y-%m-%d').date()
+                    days_old = (today - first_sale).days
+                    age_months = days_old / 30.44
+                    if age_months < 6:
+                        algo_counts['0-6m'] += 1
+                    elif age_months < 18:
+                        algo_counts['6-18m'] += 1
+                    else:
+                        algo_counts['18m+'] += 1
     
     return render_template('index.html',
         product_forecasts=product_forecasts,
