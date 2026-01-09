@@ -25,12 +25,40 @@
         <div class="stat-value">{{ "{:,}".format(total_inventory) }}</div>
         <div class="stat-change">FBA: {{ "{:,}".format(fba_total) }} | AWD: {{ "{:,}".format(awd_total) }}</div>
     </div>
+    {% if needs_seasonality_count > 0 %}
+    <div class="stat-card" style="background: linear-gradient(135deg, rgba(251, 146, 60, 0.15), rgba(234, 88, 12, 0.1)); border: 1px solid rgba(251, 146, 60, 0.3);">
+        <div class="stat-label" style="color: #fb923c;">⚠️ Missing Seasonality</div>
+        <div class="stat-value" style="color: #fb923c;">{{ needs_seasonality_count }}</div>
+        <div class="stat-change"><a href="{{ url_for('main.import_data') }}" style="color: #fb923c;">Upload Data →</a></div>
+    </div>
+    {% else %}
     <div class="stat-card warning">
         <div class="stat-label">Needs Attention</div>
         <div class="stat-value">{{ critical_count + low_stock_count }}</div>
         <div class="stat-change">{{ critical_count }} critical, {{ low_stock_count }} low</div>
     </div>
+    {% endif %}
 </div>
+
+{% if needs_seasonality_count > 0 %}
+<!-- Seasonality Warning Banner -->
+<div class="seasonality-warning" style="background: linear-gradient(135deg, rgba(251, 146, 60, 0.1), rgba(234, 88, 12, 0.05)); border: 1px solid rgba(251, 146, 60, 0.3); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between;">
+    <div>
+        <div style="color: #fb923c; font-weight: 600; margin-bottom: 0.25rem;">
+            <svg width="18" height="18" fill="currentColor" viewBox="0 0 20 20" style="vertical-align: middle; margin-right: 0.5rem;">
+                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+            </svg>
+            {{ needs_seasonality_count }} product{{ 's' if needs_seasonality_count > 1 else '' }} need{{ '' if needs_seasonality_count > 1 else 's' }} seasonality data
+        </div>
+        <div style="color: var(--text-secondary); font-size: 0.85rem;">
+            Products using 0-6m or 6-18m algorithms require seasonality data to calculate forecasts. Upload search volume data for each product.
+        </div>
+    </div>
+    <a href="{{ url_for('main.import_data') }}" class="btn btn-warning" style="background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%); white-space: nowrap;">
+        Upload Seasonality
+    </a>
+</div>
+{% endif %}
 
 <!-- Products Table -->
 <div class="card">
@@ -91,9 +119,11 @@
             </thead>
             <tbody>
                 {% for item in product_forecasts %}
-                <tr>
+                <tr class="{% if item.needs_seasonality %}needs-seasonality-row{% endif %}">
                     <td>
-                        {% if item.status == 'critical' %}
+                        {% if item.needs_seasonality %}
+                        <span class="badge badge-orange" title="Needs seasonality data">⚠️ No Data</span>
+                        {% elif item.status == 'critical' %}
                         <span class="badge badge-danger">Critical</span>
                         {% elif item.status == 'low' %}
                         <span class="badge badge-warning">Low</span>
@@ -111,13 +141,21 @@
                         {% endif %}
                     </td>
                     <td class="text-right mono {% if item.units_to_make > 0 %}text-danger{% endif %}">
+                        {% if item.needs_seasonality %}
+                        <span class="text-muted" title="Upload seasonality data to calculate">—</span>
+                        {% else %}
                         {{ "{:,}".format(item.units_to_make) }}
+                        {% endif %}
                     </td>
                     <td class="text-right mono">
+                        {% if item.needs_seasonality %}
+                        <span class="text-muted">—</span>
+                        {% else %}
                         <span class="{% if item.doi_total < 30 %}text-danger{% elif item.doi_total < 60 %}text-warning{% else %}text-success{% endif %}">
                             {{ item.doi_total }}
                         </span>
                         <span class="text-muted"> / {{ item.doi_fba }}</span>
+                        {% endif %}
                     </td>
                     <td class="text-right mono">
                         {{ "{:,}".format(item.inventory.total_inventory) }}
@@ -127,7 +165,11 @@
                         <div class="text-muted" style="font-size: 0.75rem;">{{ item.age_months }}mo</div>
                     </td>
                     <td class="text-right">
+                        {% if item.needs_seasonality %}
+                        <a href="{{ url_for('main.import_data') }}#seasonality" class="btn btn-warning btn-sm" style="background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);">Upload</a>
+                        {% else %}
                         <a href="{{ url_for('main.forecast_view', asin=item.product.asin) }}" class="btn btn-primary btn-sm">Forecast</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% endfor %}
@@ -227,6 +269,26 @@
     .algo-18mplus {
         background: rgba(168, 85, 247, 0.15);
         color: #a855f7;
+    }
+    
+    /* Needs seasonality warning */
+    .badge-orange {
+        background: rgba(251, 146, 60, 0.15);
+        color: #fb923c;
+        border: 1px solid rgba(251, 146, 60, 0.3);
+    }
+    .needs-seasonality-row {
+        background: rgba(251, 146, 60, 0.03) !important;
+    }
+    .needs-seasonality-row:hover {
+        background: rgba(251, 146, 60, 0.08) !important;
+    }
+    .btn-warning {
+        background: linear-gradient(135deg, #fb923c 0%, #ea580c 100%);
+        color: white;
+    }
+    .btn-warning:hover {
+        opacity: 0.9;
     }
     
     /* Header actions */

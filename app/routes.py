@@ -52,10 +52,13 @@ def index():
     critical_count = 0
     low_stock_count = 0
     
+    needs_seasonality_count = 0
+    
     for product, inventory in products_with_inventory:
         # Get sales data and product-specific seasonality
         sales_data = get_product_sales_data(product.id)
         seasonality = get_seasonality_data(product.id)  # Per-product seasonality
+        has_seasonality = len(seasonality) > 0
         inv_dict = {
             'total_inventory': inventory.total_inventory,
             'fba_available': inventory.fba_available
@@ -82,32 +85,44 @@ def index():
         else:
             active_algo_name = '18m+'
         
+        # Check if seasonality is required but missing
+        needs_seasonality = (active_algo_name in ['0-6m', '6-18m']) and not has_seasonality
+        if needs_seasonality:
+            needs_seasonality_count += 1
+        
         # Calculate forecast
         try:
-            forecast = generate_full_forecast(
-                product.asin,
-                sales_data,
-                seasonality,
-                inv_dict,
-                settings,
-                today
-            )
-            
-            # Get the appropriate algorithm based on product age
-            active_algo = forecast['algorithms'].get(active_algo_name, {})
-            units_to_make = active_algo.get('units_to_make', 0)
-            doi_total = active_algo.get('doi_total_days', 0)
-            doi_fba = active_algo.get('doi_fba_days', 0)
-            
-            # Determine status based on DOI
-            if doi_total < 30:
-                status = 'critical'
-                critical_count += 1
-            elif doi_total < 60:
-                status = 'low'
-                low_stock_count += 1
+            # If needs seasonality but doesn't have it, show 0
+            if needs_seasonality:
+                units_to_make = 0
+                doi_total = 0
+                doi_fba = 0
+                status = 'needs_data'
             else:
-                status = 'good'
+                forecast = generate_full_forecast(
+                    product.asin,
+                    sales_data,
+                    seasonality,
+                    inv_dict,
+                    settings,
+                    today
+                )
+                
+                # Get the appropriate algorithm based on product age
+                active_algo = forecast['algorithms'].get(active_algo_name, {})
+                units_to_make = active_algo.get('units_to_make', 0)
+                doi_total = active_algo.get('doi_total_days', 0)
+                doi_fba = active_algo.get('doi_fba_days', 0)
+                
+                # Determine status based on DOI
+                if doi_total < 30:
+                    status = 'critical'
+                    critical_count += 1
+                elif doi_total < 60:
+                    status = 'low'
+                    low_stock_count += 1
+                else:
+                    status = 'good'
             
             product_forecasts.append({
                 'product': product,
@@ -117,10 +132,13 @@ def index():
                 'doi_fba': int(doi_fba),
                 'status': status,
                 'algorithm': active_algo_name,
-                'age_months': int(product_age_months)
+                'age_months': int(product_age_months),
+                'needs_seasonality': needs_seasonality,
+                'has_seasonality': has_seasonality
             })
             
-            total_units_to_make += units_to_make
+            if not needs_seasonality:
+                total_units_to_make += units_to_make
             total_inventory += inventory.total_inventory
             
         except Exception as e:
@@ -133,7 +151,9 @@ def index():
                 'doi_fba': 0,
                 'status': 'unknown',
                 'algorithm': active_algo_name,
-                'age_months': int(product_age_months)
+                'age_months': int(product_age_months),
+                'needs_seasonality': needs_seasonality,
+                'has_seasonality': has_seasonality
             })
     
     # Filter by algorithm if specified
@@ -194,6 +214,7 @@ def index():
         awd_total=int(awd_total),
         critical_count=critical_count,
         low_stock_count=low_stock_count,
+        needs_seasonality_count=needs_seasonality_count,
         sort_by=sort_by,
         sort_order=sort_order,
         filter_algo=filter_algo,
