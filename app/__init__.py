@@ -32,7 +32,7 @@ def create_app():
     # Import and register blueprints
     from . import routes
     app.register_blueprint(routes.main_bp)
-    app.register_blueprint(routes.api_bp)
+    app.register_blueprint(routes.api_bp, url_prefix='/api')
     
     # Create tables
     with app.app_context():
